@@ -1,9 +1,9 @@
-use std::ffi::CStr;
+use anyhow::Context;
 use clap::{Parser, Subcommand};
+use flate2::write::ZlibDecoder;
+use std::ffi::CStr;
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
-use anyhow::Context;
-use flate2::write::ZlibDecoder;
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
@@ -45,17 +45,23 @@ fn main() -> anyhow::Result<()> {
             pretty_print,
             object_hash,
         } => {
+            anyhow::ensure!(pretty_print, "you must be using a pretty print format");
             let mut f = std::fs::File::open(format!(
                 ".git/objects/{}/{}",
                 &object_hash[..2],
                 &object_hash[2..]
-            )).context("Could not open object file")?;
+            ))
+            .context("Could not open object file")?;
             let mut z = ZlibDecoder::new(f);
             let mut z = BufReader::new(z);
             let mut buf = Vec::new();
-            z.read_until(0, &mut buf).context("Could not read object file")?;
-            let header = CStr::from_bytes_with_nul(&buf).expect("know there is exactly one nul.")?;
-            let header = header.to_str().context("Could not convert header to string.")?;
+            z.read_until(0, &mut buf)
+                .context("Could not read object file")?;
+            let header =
+                CStr::from_bytes_with_nul(&buf).expect("know there is exactly one nul.")?;
+            let header = header
+                .to_str()
+                .context("Could not convert header to string.")?;
             let Some((kind, size)) = header.strip_prefix(" ") else {
                 anyhow::bail!("Could not find blob prefix.")
             };
@@ -63,20 +69,24 @@ fn main() -> anyhow::Result<()> {
                 "blob" => Kind::Blob,
                 _ => anyhow::bail!("Unknown blob type."),
             };
-            let size = size.parse::<usize>().context("Could not convert size to usize.")?;
+            let size = size
+                .parse::<usize>()
+                .context("Could not convert size to usize.")?;
             buf.clear();
             buf.resize(size, 0);
-            z.read_exact(&mut buf[..]).context("Could not read object file")?;
+            z.read_exact(&mut buf[..])
+                .context("Could not read object file")?;
             let n = z.read(&mut [0]).context("validate file")?;
             anyhow::ensure!(n == 0, "Need at least one object. had {n} bytes");
             let stdout = std::io::stdout();
             let mut stdout = stdout.lock();
             match kind {
                 Kind::Blob => {
-                    stdout.write_all(&buf).context("Could not write to stdout.")?;
-                },
+                    stdout
+                        .write_all(&buf)
+                        .context("Could not write to stdout.")?;
+                }
             }
-
         }
     }
 
