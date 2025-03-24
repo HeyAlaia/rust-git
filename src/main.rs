@@ -1,7 +1,7 @@
+use std::ffi::CStr;
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use flate2::write::ZlibDecoder;
-use std::ffi::CStr;
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 
@@ -15,7 +15,6 @@ struct Args {
 
 /// Doc comment
 #[derive(Subcommand, Debug)]
-#[command(PARENT CMD ATTRIBUTE)]
 enum Command {
     /// Doc comment
     Init,
@@ -57,12 +56,15 @@ fn main() -> anyhow::Result<()> {
             let mut buf = Vec::new();
             z.read_until(0, &mut buf)
                 .context("Could not read object file")?;
+            if std::str::from_utf8(&buf).is_err() {
+                println!("buf 不是有效的 UTF-8 数据");
+            }
             let header =
-                CStr::from_bytes_with_nul(&buf).expect("know there is exactly one nul.")?;
+                CStr::from_bytes_with_nul(&buf).expect("know there is exactly one nul.");
             let header = header
                 .to_str()
                 .context("Could not convert header to string.")?;
-            let Some((kind, size)) = header.strip_prefix(" ") else {
+            let Some((kind, size)) = header.split_once(" ") else {
                 anyhow::bail!("Could not find blob prefix.")
             };
             let kind = match kind {
