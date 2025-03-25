@@ -2,8 +2,12 @@ use std::ffi::CStr;
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use flate2::read::ZlibDecoder;
-use std::fs;
+use flate2::write::ZlibEncoder;
+use std::{fs, io};
 use std::io::{BufRead, BufReader, Read, Write};
+use std::path::{Path, PathBuf};
+use flate2::Compression;
+use sha1::{Digest, Sha1};
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
@@ -22,6 +26,11 @@ enum Command {
         #[clap(short = 'p')]
         pretty_print: bool,
         object_hash: String,
+    },
+    HashObject {
+        #[clap(short = 'w')]
+        write: bool,
+        file: PathBuf,
     },
 }
 
@@ -72,25 +81,63 @@ fn main() -> anyhow::Result<()> {
                 _ => anyhow::bail!("Unknown blob type."),
             };
             let size = size
-                .parse::<usize>()
+                .parse::<u64>()
                 .context("Could not convert size to usize.")?;
-            buf.clear();
-            buf.resize(size, 0);
-            z.read_exact(&mut buf[..])
-                .context("Could not read object file")?;
-            let n = z.read(&mut [0]).context("validate file")?;
-            anyhow::ensure!(n == 0, "Need at least one object. had {n} bytes");
-            let stdout = std::io::stdout();
-            let mut stdout = stdout.lock();
+            let mut z = z.take(size);
             match kind {
                 Kind::Blob => {
-                    stdout
-                        .write_all(&buf)
-                        .context("Could not write to stdout.")?;
+                    let stdout = std::io::stdout();
+                    let mut stdout = stdout.lock();
+                    let n = std::io::copy(&mut z, &mut stdout).context("write .git blob file")?;
+                    anyhow::ensure!(n == size, "expected to find blob size: {size},actual: {n}");
                 }
             }
         }
+        Command::HashObject { write, file, } => {
+            fn write_blob<W>(file: &Path, writer: W) -> anyhow::Result<String> where W: Write {
+                let stat = std::fs::metadata(file).context("read file metadata")?;
+                let writer = ZlibEncoder::new(writer,Compression::default());
+                let mut writer = HashWriter {
+                    writer,
+                    hasher: Sha1::new(),
+                };
+                write!(writer,"blob ");
+                write!(writer,"{}\0",stat.len());
+                let mut file = fs::File::open(file).context("read file")?;
+                std::io::copy(&mut file, &mut writer).context("write file")?;
+                let _ = writer.writer.finish()?;
+                let hash = writer.hasher.finalize();
+                Ok(hex::encode(hash))
+            }
+            let hash = if write {
+                let tmp = "temporary";
+                let hash = write_blob(&file,std::fs::File::create(tmp).context("construct temporary file for blob")?).context("construct temporary file for blob")?;
+                fs::create_dir_all(format!(".git/objects/{}/",&hash[..2])).context("creat sub dir of .git")?;
+                fs::rename(tmp, format!(".git/objects/{}/{}",&hash[..2],&hash[2..])).context("rename sub dir of .git")?;
+                hash
+            }else {
+                write_blob(&file, std::io::sink()).context("write out file")?;
+                "you must be using a '-w' format".parse()?
+            };
+            println!("{hash}")
+        }
+    }
+    Ok(())
+}
+
+struct HashWriter<W> {
+    writer: W,
+    hasher: Sha1,
+}
+
+impl<W> Write for HashWriter<W> where W: Write{
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let n = self.writer.write(buf)?;
+        self.hasher.update(&buf[..n]);
+        Ok(n)
     }
 
-    Ok(())
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.writer.flush()
+    }
 }
