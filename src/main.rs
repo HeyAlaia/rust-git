@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use flate2::write::ZlibDecoder;
+use flate2::read::ZlibDecoder;
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 
@@ -45,13 +45,13 @@ fn main() -> anyhow::Result<()> {
             object_hash,
         } => {
             anyhow::ensure!(pretty_print, "you must be using a pretty print format");
-            let mut f = std::fs::File::open(format!(
+            let f = std::fs::File::open(format!(
                 ".git/objects/{}/{}",
                 &object_hash[..2],
                 &object_hash[2..]
             ))
             .context("Could not open object file")?;
-            let mut z = ZlibDecoder::new(f);
+            let z = ZlibDecoder::new(f);
             let mut z = BufReader::new(z);
             let mut buf = Vec::new();
             z.read_until(0, &mut buf)
