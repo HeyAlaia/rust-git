@@ -1,9 +1,9 @@
-use std::ffi::CStr;
 use anyhow::Context;
-use clap::{Parser};
+use clap::Parser;
 use flate2::read::ZlibDecoder;
-use std::io::{BufRead, BufReader, Read, Write};
-use sha1::{Digest};
+use sha1::Digest;
+use std::ffi::CStr;
+use std::io::{BufRead, BufReader, Read};
 
 enum Kind {
     Blob,

@@ -1,9 +1,9 @@
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use std::{fs};
+use sha1::Digest;
+use std::fs;
 use std::io::{BufRead, Read, Write};
-use std::path::{PathBuf};
-use sha1::{Digest};
+use std::path::PathBuf;
 
 mod commands;
 
@@ -30,9 +30,11 @@ enum Command {
         write: bool,
         file: PathBuf,
     },
+    LsTree {
+        #[clap(long)]
+        name_only: bool,
+    },
 }
-
-
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
@@ -49,8 +51,8 @@ fn main() -> anyhow::Result<()> {
             pretty_print,
             object_hash,
         } => commands::cat_files::invoke(pretty_print, &object_hash)?,
-        Command::HashObject { write, file, } => commands::hash_object::invoke(write, &file)?,
+        Command::HashObject { write, file } => commands::hash_object::invoke(write, &file)?,
+        Command::LsTree { name_only } => commands::ls_tree::invoke(name_only)?,
     }
     Ok(())
 }
-
