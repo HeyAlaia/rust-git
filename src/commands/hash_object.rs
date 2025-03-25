@@ -1,7 +1,7 @@
 use anyhow::Context;
 use clap::Parser;
-use flate2::write::ZlibEncoder;
 use flate2::Compression;
+use flate2::write::ZlibEncoder;
 use sha1::{Digest, Sha1};
 use std::fs;
 use std::io::Write;

@@ -9,7 +9,6 @@ enum Kind {
     Blob,
 }
 
-
 pub(crate) fn invoke(pretty_print: bool, object_hash: &str) -> anyhow::Result<()> {
     anyhow::ensure!(pretty_print, "you must be using a pretty print format");
     let f = std::fs::File::open(format!(
@@ -17,7 +16,7 @@ pub(crate) fn invoke(pretty_print: bool, object_hash: &str) -> anyhow::Result<()
         &object_hash[..2],
         &object_hash[2..]
     ))
-        .context("Could not open object file")?;
+    .context("Could not open object file")?;
     let z = ZlibDecoder::new(f);
     let mut z = BufReader::new(z);
     let mut buf = Vec::new();
@@ -26,8 +25,7 @@ pub(crate) fn invoke(pretty_print: bool, object_hash: &str) -> anyhow::Result<()
     if std::str::from_utf8(&buf).is_err() {
         println!("buf 不是有效的 UTF-8 数据");
     }
-    let header =
-        CStr::from_bytes_with_nul(&buf).expect("know there is exactly one nul.");
+    let header = CStr::from_bytes_with_nul(&buf).expect("know there is exactly one nul.");
     let header = header
         .to_str()
         .context("Could not convert header to string.")?;
