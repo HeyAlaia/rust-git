@@ -6,6 +6,7 @@ use std::io::{BufRead, Read, Write};
 use std::path::PathBuf;
 
 mod commands;
+mod objects;
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
